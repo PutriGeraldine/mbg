@@ -4,43 +4,51 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
     public function showRegisterForm()
     {
-        $roles = Role::whereNotIn('name', ['super-admin', 'user'])->get();
+        $roles = Role::where('name', '!=', 'super-admin')->pluck('name');
         return view('auth.register', compact('roles'));
     }
 
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
+            'name'     => 'required',
+            'email'    => 'required|email|unique:users',
             'password' => 'required|confirmed',
-            'role' => 'nullable|exists:roles,name'
+            'role' => 'required|exists:roles,name',
         ]);
 
-        $status = ($request->role == 'user' || !$request->role) ? 'active' : 'pending';
+        $requestedRole = $request->role;
+
+        // user biasa langsung aktif
+        $status = ($requestedRole === 'user') ? 'active' : 'pending';
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'status' => $status
+            'name'           => $request->name,
+            'email'          => $request->email,
+            'password'       => Hash::make($request->password),
+            'status'         => $status,
+            'requested_role' => $requestedRole,
         ]);
 
-        if ($request->role && $request->role != 'user') {
-            $user->assignRole($request->role);
-        } else {
+        // kalau user biasa langsung assign
+        if ($requestedRole === 'user') {
             $user->assignRole('user');
         }
 
-        return redirect()->route('login')->with('success', 'Register berhasil, '.($status=='pending'?'menunggu approval':'silakan login'));
+        return redirect()->route('login')
+            ->with('success',
+                $status === 'pending'
+                ? 'Register berhasil, menunggu approval'
+                : 'Register berhasil, silakan login'
+            );
     }
 
     public function showLoginForm()
@@ -50,26 +58,29 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = $request->only('email','password');
 
         if (Auth::attempt($credentials)) {
+
             $user = Auth::user();
-            if ($user->status != 'active') {
+
+            if ($user->status !== 'active') {
                 Auth::logout();
-                return redirect()->back()->withErrors(['email'=>'Akun Anda belum di-approve super-admin']);
+                return back()->withErrors([
+                    'email' => 'Akun Anda belum di-approve super-admin'
+                ]);
             }
 
-            return redirect()->route('dashboard');
+            if ($user->hasRole('super-admin')) return redirect()->route('superadmin.dashboard');
+            if ($user->hasRole('admin'))       return redirect()->route('admin.dashboard');
+            if ($user->hasRole('pemda'))       return redirect()->route('pemda.dashboard');
+            if ($user->hasRole('user'))        return redirect()->route('user.dashboard');
+
+            Auth::logout();
+            return back()->withErrors(['email'=>'Role user tidak valid']);
         }
 
-        return redirect()->back()->withErrors(['email'=>'Email atau password salah']);
-    }
-
-    public function dashboard()
-    {
-        $user = Auth::user();
-        $roles = Auth::user()->roles->pluck('name')->implode(', ');
-        return view('auth.dashboard', compact('user', 'roles'));
+        return back()->withErrors(['email'=>'Email atau password salah']);
     }
 
     public function logout()
@@ -78,19 +89,39 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 
-    // Super Admin
+    public function rolePermission()
+    {
+        $users = User::whereDoesntHave('roles', function ($query) {
+            $query->where('name', 'super-admin');
+        })->get();
+
+        return view('rolepermission', compact('users'));
+    }
+
     public function pendingUsers()
     {
-        $users = User::role(['admin','pemda'])->where('status','pending')->get();
+        $users = User::whereIn('requested_role',['admin','pemda'])
+                    ->where('status','pending')
+                    ->get();
+
         return view('auth.pending', compact('users'));
     }
 
     public function approveUser($id)
     {
         $user = User::findOrFail($id);
-        $user->status = 'active';
-        $user->save();
 
-        return redirect()->back()->with('success','User berhasil di-approve');
+        $user->assignRole($user->requested_role);
+        $user->update(['status'=>'active']);
+
+        return back()->with('success','User berhasil di-approve');
+    }
+
+    public function rejectUser($id)
+    {
+        $user = User::findOrFail($id);
+        $user->update(['status'=>'rejected']);
+
+        return back()->with('success','User ditolak');
     }
 }

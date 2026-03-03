@@ -6,7 +6,9 @@
 <h2>Daftar</h2>
 
 @if(session('success'))
-<div class="success">{{ session('success') }}</div>
+<div style="color:red;">
+    {{ session('success') }}
+</div>
 @endif
 
 <form id="form-register" action="{{ route('register') }}" method="POST">
@@ -15,9 +17,9 @@
     <input type="email" name="email" placeholder="Email" required>
     <select name="role" required>
         <option value="">Pilih Role</option>
-        <option value="admin">Admin</option>
-        <option value="pemda">Pemda</option>
-        <option value="user">User</option>
+        @foreach($roles as $role)
+            <option value="{{ $role }}">{{ ucfirst($role) }}</option>
+        @endforeach
     </select>
     <input type="password" name="password" placeholder="Password" required>
     <input type="password" name="password_confirmation" placeholder="Konfirmasi Password" required>

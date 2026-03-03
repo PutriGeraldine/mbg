@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Aplikasi')</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
             margin:0;
@@ -15,6 +15,10 @@
             display:flex;
             justify-content:center;
             align-items:center;
+        }
+
+        body.dashboard-mode {
+            display:block !important;
         }
 
         .card {
@@ -100,17 +104,13 @@
         }
 
         .btn-login {
-            background: #3399ff;   /* biru */
+            background: #3399ff;
             color: #fff;
         }
 
         .btn-login:hover {
-            background: #007acc;   /* biru lebih gelap saat hover */
+            background: #007acc;
         }
-
-        /* ============================= */
-        /* PASSWORD OVERLAY (IMPROVED)  */
-        /* ============================= */
 
         .password-overlay {
             position:absolute;
@@ -143,7 +143,7 @@
         .password-overlay li {
             display:flex;
             align-items:center;
-            gap:10px;              /* jarak antara bulatan dan teks */
+            gap:10px;
             font-size:14px;
             margin:6px 0;
             color:#555;
@@ -171,26 +171,65 @@
             border:none;
         }
 
+        /* DASHBOARD MODE */
+        body.dashboard-mode {
+            display:block !important;
+            height:auto !important;
+            background:#f4f6f9;
+            padding-bottom: 80px;
+            padding-top: 60px;
+        }
+
+        .dashboard-wrapper {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .dashboard-wrapper.collapsed .sidebar {
+            width: 70px;
+        }
+
+        .dashboard-wrapper.collapsed .sidebar .sidebar-header,
+        .dashboard-wrapper.collapsed .sidebar-menu span {
+            display: none;
+        }
+
+        .dashboard-content {
+            flex:1;
+            padding:30px;
+        }
+
+        body.dashboard-mode .card {
+            display:none;
+        }
+
     </style>
 </head>
-<body>
 
-<div class="card">
 
-    <img src="{{ asset('assets/logo.png') }}" class="logo">
-    <div class="subtext">Satuan Penjamin Pemenuhan Gizi</div>
+<!-- TAMBAHAN -->
+<body class="@yield('body-class')">
 
-    @if ($errors->any())
-        <div class="alert-error">
-            @foreach ($errors->all() as $error)
-                <div>{{ $error }}</div>
-            @endforeach
-        </div>
-    @endif
+@if(trim($__env->yieldContent('body-class')) == '')
+    <div class="card">
 
+        <img src="{{ asset('assets/logo.png') }}" class="logo">
+        <div class="subtext">Satuan Penjamin Pemenuhan Gizi</div>
+
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
+        @yield('content')
+
+    </div>
+@else
     @yield('content')
+@endif
 
-</div>
+<!-- END TAMBAHAN -->
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -250,6 +289,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
 
     });
+
+});
+</script>
+
+<script>
+document.getElementById('toggleSidebar').addEventListener('click', function() {
+
+    document.querySelector('.sidebar').classList.toggle('collapsed');
+    document.querySelector('.main-content').classList.toggle('expanded');
+    document.querySelector('.navbar').classList.toggle('expanded');
 
 });
 </script>
